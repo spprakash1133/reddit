@@ -167,23 +167,29 @@ Reply:`
   }
 
   async function loadComments(pid) {
-    const post = posts.find(p=>safeId(p.id||p.url||'')===pid)
+    const post = [...posts, ...bookmarks].find(p=>safeId(p.id||p.url||'')===pid)
     if (!post) return
     const cur = openCmts[pid]
     if (cur?.open) { setOpenCmts(prev=>({...prev,[pid]:{...prev[pid],open:false}})); return }
     setOpenCmts(prev=>({...prev,[pid]:{open:true,loading:true,comments:[]}}))
     try {
-      const pathname = new URL(post.url).pathname.replace(/\/$/, '')
-      const r = await fetch('https://www.reddit.com'+pathname+'.json?limit=8&sort=top',{headers:{Accept:'application/json'}})
+      // post.permalink always points to the Reddit comments page; post.url
+      // can be an external link (e.g. github.com/...) for link-type posts.
+      let path = post.permalink || ''
+      if (!path && post.url) path = new URL(post.url).pathname
+      path = path.replace(/\/$/, '')
+      if (!path) throw new Error('No Reddit URL on this post')
+      const r = await fetch('https://www.reddit.com'+path+'.json?limit=10&sort=top',{headers:{Accept:'application/json'}})
       if (!r.ok) throw new Error('Reddit '+r.status)
       const data = await r.json()
       const cmts = (data[1]?.data?.children||[])
-        .filter(c=>c.kind==='t1'&&c.data.body&&c.data.body!=='[deleted]')
+        .filter(c=>c.kind==='t1'&&c.data.body&&c.data.body!=='[deleted]'&&c.data.body!=='[removed]')
         .slice(0,5)
         .map(c=>({id:c.data.id,author:c.data.author,score:c.data.ups,body:c.data.body,created:new Date(c.data.created_utc*1000).toISOString()}))
       setOpenCmts(prev=>({...prev,[pid]:{open:true,loading:false,comments:cmts}}))
     } catch(e) {
       setOpenCmts(prev=>({...prev,[pid]:{open:false,loading:false,comments:[]}}))
+      pushNotif('⚠️','Couldn\'t load comments',e.message||'')
     }
   }
 
@@ -448,13 +454,6 @@ Reply:`
             <span className="sb-label">Posts to fetch</span>
             <input type="range" min="5" max="100" step="5" value={limit} onChange={e=>setLimit(+e.target.value)} className="sb-range" />
             <div className="sb-range-num">{limit} posts</div>
-          </div>
-
-          <div className="sb-section sb-status">
-            <div className="sb-status-row">
-              <div className="sb-status-dot" />
-              <span>Live · Free Reddit JSON API</span>
-            </div>
           </div>
         </aside>
 
