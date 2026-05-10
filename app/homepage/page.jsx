@@ -6,8 +6,6 @@ import { Suspense } from 'react'
 import { fmt, ago, safeId, hlText, store, fetchRedditPosts } from '../../lib/utils'
 import { callAI } from '../../lib/replyEngine'
 
-const SHEETS_URL = process.env.NEXT_PUBLIC_SHEETS_URL
-
 const TONES = ['Helpful','Professional','Casual','Witty','Empathetic','Direct']
 const TONE_PROMPTS = {
   Helpful:'Be genuinely helpful and informative. Share real insights.',

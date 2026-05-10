@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 
-// Dodo currently exposes the same REST host for live + test; mode is determined by the
-// API key you use. We keep MODE around in case the SDK uses it on the client side.
 const DODO_BASE = 'https://live.dodopayments.com'
+const PRODUCT_IDS = {
+  starter: 'pdt_0NeOuZ2Dd8vo1838y0EKu',
+  pro:     'pdt_0NeOuwMCbGZzOiiA6pyoi',
+}
+const APP_URL = 'https://scoutreddit.com'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,20 +17,12 @@ export async function POST(request) {
     }
 
     const { planId, email, name } = await request.json()
-    if (!planId || !['starter', 'pro'].includes(planId)) {
+    if (!planId || !PRODUCT_IDS[planId]) {
       return NextResponse.json({ error: 'Invalid planId' }, { status: 400 })
     }
 
-    const productId = planId === 'pro'
-      ? process.env.DODO_PRO_PRODUCT_ID
-      : process.env.DODO_STARTER_PRODUCT_ID
-
-    if (!productId) {
-      return NextResponse.json({ error: `Missing product ID for ${planId}` }, { status: 500 })
-    }
-
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://scoutreddit.com'
-    const returnUrl = `${appUrl}/homepage?payment=success&plan=${planId}`
+    const productId = PRODUCT_IDS[planId]
+    const returnUrl = `${APP_URL}/homepage?payment=success&plan=${planId}`
 
     const res = await fetch(`${DODO_BASE}/subscriptions`, {
       method: 'POST',

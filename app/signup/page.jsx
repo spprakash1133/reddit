@@ -5,8 +5,8 @@ import Script from 'next/script'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-const SHEETS_URL       = process.env.NEXT_PUBLIC_SHEETS_URL
+const GOOGLE_CLIENT_ID = '582381287068-io9joj0kkqbrhnp33s6n06q6dd7niede.apps.googleusercontent.com'
+const SHEETS_URL       = 'https://script.google.com/macros/s/AKfycbyElB41_PM_KMrpu2UjvchHtncl46lTYrP6SkoSvdx22rqPI3iAaJbG6W_vluOomI78/exec'
 
 function SignupForm() {
   const router       = useRouter()
