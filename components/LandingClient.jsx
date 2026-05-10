@@ -6,7 +6,6 @@ export default function LandingClient() {
   const [mobOpen, setMobOpen] = useState(false)
 
   useEffect(() => {
-    // Scroll reveal
     const obs = new IntersectionObserver(
       entries => entries.forEach(x => { if (x.isIntersecting) x.target.classList.add('in') }),
       { threshold: 0.1 }
@@ -15,81 +14,31 @@ export default function LandingClient() {
 
     const handleScroll = () => {
       const nav = document.getElementById('l-nav')
-      if (nav) nav.style.borderBottomColor = window.scrollY > 30 ? 'rgba(255,255,255,.09)' : 'rgba(255,255,255,.06)'
+      if (nav) nav.classList.toggle('scrolled', window.scrollY > 30)
     }
     window.addEventListener('scroll', handleScroll, { passive: true })
-
-    // Init Dodo (defensive — SDK may not load on first paint or be blocked)
-    const tryDodo = setInterval(() => {
-      if (typeof window !== 'undefined' && typeof window.DodoPaymentsCheckout !== 'undefined') {
-        clearInterval(tryDodo)
-        try {
-          window.DodoPaymentsCheckout.DodoPayments.Initialize({
-            mode: 'live',
-            displayType: 'overlay',
-            onEvent: (e) => {
-              if (['payment.succeeded', 'checkout.completed', 'subscription.active'].includes(e?.type)) {
-                const plan = window._pendingPlan || 'starter'
-                try { localStorage.setItem('sr_plan', plan) } catch {}
-                window.location.href = '/homepage?payment=success&plan=' + plan
-              }
-            },
-          })
-        } catch (err) { console.warn('Dodo init failed', err) }
-      }
-    }, 300)
-    // Stop polling after 12 seconds even if SDK never loads
-    const stopDodo = setTimeout(() => clearInterval(tryDodo), 12000)
 
     return () => {
       obs.disconnect()
       window.removeEventListener('scroll', handleScroll)
-      clearInterval(tryDodo)
-      clearTimeout(stopDodo)
     }
   }, [])
 
-  // Close mobile menu when clicking an in-page anchor
   function closeMob() { setMobOpen(false) }
-
-  async function goCheckout(planId, btn) {
-    let user = null
-    try { user = JSON.parse(localStorage.getItem('sr_user') || 'null') } catch {}
-    if (!user) { window.location.href = '/signup?plan=' + planId; return }
-    if (btn) { btn.textContent = 'Opening…'; btn.disabled = true }
-    window._pendingPlan = planId
-    try {
-      const res = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, email: user.email, name: user.name }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.url) throw new Error(data.error || `Checkout failed (${res.status})`)
-      if (typeof window.DodoPaymentsCheckout !== 'undefined') {
-        window.DodoPaymentsCheckout.DodoPayments.Checkout.open({ checkoutUrl: data.url })
-      } else {
-        window.location.href = data.url
-      }
-    } catch (e) {
-      alert('Checkout error: ' + e.message)
-    }
-    if (btn) { btn.textContent = planId === 'starter' ? 'Get Starter →' : 'Start Pro free →'; btn.disabled = false }
-  }
 
   return (
     <>
       {/* NAV */}
-      <nav id="l-nav" style={{position:'fixed',top:0,left:0,right:0,zIndex:200,height:58,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 32px',background:'rgba(7,9,15,.88)',backdropFilter:'blur(14px)',borderBottom:'1px solid rgba(255,255,255,.06)',transition:'border-color .3s'}}>
+      <nav id="l-nav" className="l-nav">
         <Link href="/" className="logo" onClick={closeMob}>Scout<span>Reddit</span></Link>
         <div className="nav-links">
           <a href="#features">Features</a>
+          <a href="#how">How it works</a>
           <a href="#pricing">Pricing</a>
-          <Link href="/signup?tab=login">Log in</Link>
         </div>
         <div className="nav-right">
           <Link href="/signup?tab=login" className="btn-ghost-sm">Log in</Link>
-          <Link href="/signup" className="btn-acc-sm">Start free →</Link>
+          <Link href="/signup" className="btn-acc-sm">Start 7-day trial</Link>
         </div>
         <button
           className="hamburger"
@@ -102,41 +51,44 @@ export default function LandingClient() {
       </nav>
 
       {/* MOBILE NAV */}
-      <div className="mob-nav" style={{display: mobOpen ? 'flex' : 'none'}}>
-        <a href="#features" onClick={closeMob}>Features</a>
-        <a href="#pricing" onClick={closeMob}>Pricing</a>
-        <Link href="/signup?tab=login" onClick={closeMob}>Log in</Link>
-        <Link href="/signup" onClick={closeMob}>Start free →</Link>
-      </div>
+      {mobOpen && (
+        <div className="mob-nav">
+          <a href="#features" onClick={closeMob}>Features</a>
+          <a href="#how" onClick={closeMob}>How it works</a>
+          <a href="#pricing" onClick={closeMob}>Pricing</a>
+          <Link href="/signup?tab=login" onClick={closeMob}>Log in</Link>
+          <Link href="/signup" onClick={closeMob} className="btn-acc-sm" style={{textAlign:'center'}}>Start 7-day trial →</Link>
+        </div>
+      )}
 
       {/* HERO */}
       <section id="hero">
         <div className="hero-grid">
           <div>
-            <div className="hero-badge"><span className="pulse"></span>Now live — start for free</div>
-            <h1>Reddit is your<br /><em>demand engine.</em><br />Get on it.</h1>
-            <p className="hero-sub">Find the right conversations, drop replies that convert, and turn attention into real users — without getting downvoted or banned.</p>
+            <div className="hero-badge"><span className="pulse"></span>7-day free trial · No card required</div>
+            <h1>Find the Reddit threads<br /><em>your customers are in.</em></h1>
+            <p className="hero-sub">ScoutReddit surfaces high-intent posts on Reddit, drafts replies that sound human, and helps you turn conversations into customers — without spam, ads, or getting downvoted.</p>
             <div className="hero-ctas">
-              <Link href="/signup" className="btn-primary">Start free →</Link>
-              <a href="#features" className="btn-outline">See how it works</a>
+              <Link href="/signup" className="btn-primary">Start 7-day trial →</Link>
+              <a href="#how" className="btn-outline">See how it works</a>
             </div>
-            <p className="hero-note">No credit card · 2-minute setup</p>
+            <p className="hero-note">Full access · No credit card · 2-min setup</p>
           </div>
-          <div className="hero-cards">
+          <div className="hero-cards" aria-hidden="true">
             <div className="hcard">
-              <div className="hc-top"><span className="hc-sub">r/SaaS · 14 mins ago</span><span className="intent i-hi">High intent</span></div>
-              <div className="hc-title">Any tools that help find Reddit threads where people need my product?</div>
-              <div className="hc-meta"><span>▲ 318</span><span>💬 47 comments</span></div>
+              <div className="hc-top"><span className="hc-sub">r/SaaS · 14m ago</span><span className="intent i-hi">High intent</span></div>
+              <div className="hc-title">Any tool to find Reddit threads where people need my product?</div>
+              <div className="hc-meta"><span>▲ 318</span><span>💬 47</span></div>
             </div>
             <div className="hcard">
-              <div className="hc-top"><span className="hc-sub">r/Entrepreneur · 41 mins ago</span><span className="intent i-hi">High intent</span></div>
+              <div className="hc-top"><span className="hc-sub">r/Entrepreneur · 41m ago</span><span className="intent i-hi">High intent</span></div>
               <div className="hc-title">How do you get users without spending money on ads?</div>
-              <div className="hc-meta"><span>▲ 892</span><span>💬 124 comments</span></div>
+              <div className="hc-meta"><span>▲ 892</span><span>💬 124</span></div>
             </div>
             <div className="hcard">
-              <div className="hc-top"><span className="hc-sub">r/startups · 2 hrs ago</span><span className="intent i-md">Medium intent</span></div>
+              <div className="hc-top"><span className="hc-sub">r/startups · 2h ago</span><span className="intent i-md">Medium intent</span></div>
               <div className="hc-title">What&apos;s the best way to validate a product idea before building?</div>
-              <div className="hc-meta"><span>▲ 231</span><span>💬 53 comments</span></div>
+              <div className="hc-meta"><span>▲ 231</span><span>💬 53</span></div>
             </div>
           </div>
         </div>
@@ -152,61 +104,115 @@ export default function LandingClient() {
         </div>
       </div>
 
+      {/* HOW IT WORKS */}
+      <section id="how" className="lsec">
+        <div className="linner">
+          <div className="sec-hdr reveal">
+            <div className="chip">How it works</div>
+            <h2 className="l-h2">From cold subreddit to warm reply in three steps.</h2>
+          </div>
+          <div className="how-grid">
+            <div className="how-step reveal">
+              <div className="how-num">01</div>
+              <h3>Tell us your topic</h3>
+              <p>Enter a subreddit, keyword, or competitor. ScoutReddit pulls every fresh post that matches.</p>
+            </div>
+            <div className="how-step reveal d1">
+              <div className="how-num">02</div>
+              <h3>Spot high-intent threads</h3>
+              <p>Posts get scored on buying intent so you skip the noise and reply where it actually matters.</p>
+            </div>
+            <div className="how-step reveal d2">
+              <div className="how-num">03</div>
+              <h3>Drop a reply that converts</h3>
+              <p>Get a draft that sounds like a real human, in the tone the subreddit expects. Edit, copy, post.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FEATURES */}
       <section id="features" className="lsec">
         <div className="linner">
-          <div style={{textAlign:'center',maxWidth:560,margin:'0 auto 52px'}} className="reveal">
-            <div className="chip" style={{justifyContent:'center'}}>Features</div>
-            <h2 className="l-h2" style={{textAlign:'center',marginBottom:0}}>Everything you need to win on Reddit</h2>
+          <div className="sec-hdr reveal">
+            <div className="chip">Features</div>
+            <h2 className="l-h2">Everything you need to win on Reddit.</h2>
           </div>
           <div className="feat-grid">
-            <div className="feat reveal"><div className="feat-num">01</div><div className="feat-ico">🎯</div><h3>Conversation Finder</h3><p>Surface threads where people are already asking for solutions like yours. Scored by intent.</p><span className="feat-tag">Intent scoring</span></div>
-            <div className="feat reveal d1"><div className="feat-num">02</div><div className="feat-ico">🗣</div><h3>Human-like Replies</h3><p>Generate responses that match subreddit tone — helpful, natural, and non-salesy.</p><span className="feat-tag">Tone matching</span></div>
-            <div className="feat reveal d2"><div className="feat-num">03</div><div className="feat-ico">🔖</div><h3>Bookmark & Track</h3><p>Save high-value posts, monitor competitors, set keyword alerts with upvote thresholds.</p><span className="feat-tag">Lead tracking</span></div>
-            <div className="feat reveal"><div className="feat-num">04</div><div className="feat-ico">📊</div><h3>Sentiment Analysis</h3><p>See how Reddit talks about your brand vs competitors with real post data.</p><span className="feat-tag">Competitive intel</span></div>
-            <div className="feat reveal d1"><div className="feat-num">05</div><div className="feat-ico">🕵</div><h3>Competitor Monitor</h3><p>Get notified when your competitors are mentioned. Be first to reply.</p><span className="feat-tag">Real-time</span></div>
-            <div className="feat reveal d2" style={{background:'var(--adim)',border:'1px solid var(--ab)'}}>
-              <div className="feat-num" style={{color:'var(--acc)'}}>→</div>
+            <div className="feat reveal">
+              <div className="feat-num">01</div><div className="feat-ico">🎯</div>
+              <h3>Conversation finder</h3>
+              <p>Surface Reddit threads where people are already asking for what you sell. Each one scored on intent.</p>
+              <span className="feat-tag">Intent scoring</span>
+            </div>
+            <div className="feat reveal d1">
+              <div className="feat-num">02</div><div className="feat-ico">🗣</div>
+              <h3>Replies that sound human</h3>
+              <p>Drafts written to match the subreddit&apos;s tone — helpful, on-topic, never salesy.</p>
+              <span className="feat-tag">Tone matching</span>
+            </div>
+            <div className="feat reveal d2">
+              <div className="feat-num">03</div><div className="feat-ico">🔖</div>
+              <h3>Watchlist &amp; alerts</h3>
+              <p>Save high-value threads. Get notified when a new post matches your keyword and crosses an upvote threshold.</p>
+              <span className="feat-tag">Real-time alerts</span>
+            </div>
+            <div className="feat reveal">
+              <div className="feat-num">04</div><div className="feat-ico">📊</div>
+              <h3>Sentiment view</h3>
+              <p>See exactly how Reddit feels about your brand vs your competitors — pulled from real post data.</p>
+              <span className="feat-tag">Competitive intel</span>
+            </div>
+            <div className="feat reveal d1">
+              <div className="feat-num">05</div><div className="feat-ico">🕵</div>
+              <h3>Competitor monitor</h3>
+              <p>The moment a competitor gets mentioned, you know. Be the first useful voice in the thread.</p>
+              <span className="feat-tag">Real-time</span>
+            </div>
+            <div className="feat reveal d2 feat-cta">
               <div className="feat-ico">🚀</div>
-              <h3 style={{color:'var(--acc)'}}>Start in minutes</h3>
-              <p>Enter your product. See threads. Drop replies.</p>
-              <Link href="/signup" className="btn-primary" style={{marginTop:18,fontSize:13,padding:'10px 20px',display:'inline-flex'}}>Try it free →</Link>
+              <h3>Free for 7 days</h3>
+              <p>Full access. No card. See real leads inside your first session.</p>
+              <Link href="/signup" className="btn-primary btn-primary-sm">Start trial →</Link>
             </div>
           </div>
         </div>
       </section>
 
       {/* PRICING */}
-      <section id="pricing" className="lsec" style={{background:'var(--ink2)'}}>
+      <section id="pricing" className="lsec lsec-alt">
         <div className="linner">
-          <div style={{textAlign:'center'}} className="reveal">
-            <div className="chip" style={{justifyContent:'center'}}>Pricing</div>
-            <h2 className="l-h2" style={{textAlign:'center',marginBottom:10}}>Simple, honest pricing</h2>
-            <p style={{fontSize:15,color:'var(--muted)'}}>Start free. Upgrade when you&apos;re getting results.</p>
+          <div className="sec-hdr reveal">
+            <div className="chip">Pricing</div>
+            <h2 className="l-h2">Try it free for 7 days.</h2>
+            <p className="sec-sub">Full access during your trial. No credit card. Decide if it&apos;s worth keeping.</p>
           </div>
-          <div className="price-grid">
-            <div className="plan reveal">
-              <div className="plan-name">Starter — Monthly</div>
-              <div className="plan-price">$9<sub>/mo</sub></div>
-              <div className="plan-period">Billed monthly · cancel anytime</div>
-              <ul className="plan-feats">
-                <li>25 posts per fetch</li><li>250 AI replies/month</li><li>Watchlist alerts</li>
-                <li>10 keywords monitoring</li><li>Bookmarks</li><li>Auto sync</li>
-              </ul>
-              <button className="plan-btn out" onClick={e => goCheckout('starter', e.currentTarget)}>Get Starter →</button>
-            </div>
-            <div className="plan pro reveal d1">
-              <div className="plan-badge-tag">MOST POPULAR</div>
-              <div className="plan-name">Pro — Monthly</div>
-              <div className="plan-price">$20<sub>/mo</sub></div>
-              <div className="plan-period">Billed monthly · cancel anytime</div>
-              <ul className="plan-feats">
-                <li>Unlimited posts</li><li>750 AI replies/month</li><li>Competitor monitor</li>
-                <li>Sentiment analysis</li><li>30 keywords monitoring</li><li>Priority support</li>
-              </ul>
-              <button className="plan-btn acc" onClick={e => goCheckout('pro', e.currentTarget)}>Start Pro free →</button>
-            </div>
+          <div className="trial-card reveal">
+            <div className="trial-tag">EARLY ACCESS</div>
+            <div className="trial-name">7-Day Free Trial</div>
+            <div className="trial-price">$0</div>
+            <div className="trial-period">For your first week — full feature set</div>
+            <ul className="trial-feats">
+              <li>Unlimited Reddit post fetches</li>
+              <li>AI reply drafts in 6 tones</li>
+              <li>Watchlists with upvote-threshold alerts</li>
+              <li>Competitor monitor + sentiment view</li>
+              <li>Bookmarks &amp; saved threads</li>
+              <li>Email signup logging to your sheet</li>
+            </ul>
+            <Link href="/signup" className="btn-primary trial-cta">Start 7-day trial →</Link>
+            <div className="trial-note">No card. No auto-renew. Cancel by closing the tab.</div>
           </div>
+        </div>
+      </section>
+
+      {/* FINAL CTA */}
+      <section id="final-cta">
+        <div className="fcta-in">
+          <h2>Stop guessing where your <em>customers</em> hang out.</h2>
+          <p>They&apos;re already on Reddit, asking for what you built. Find them in the next 10 minutes.</p>
+          <Link href="/signup" className="btn-primary">Start 7-day trial →</Link>
+          <div className="live-chip"><span className="ldot"></span>Live · 500+ founders shipping daily</div>
         </div>
       </section>
 
@@ -214,12 +220,18 @@ export default function LandingClient() {
       <footer>
         <div className="foot-in">
           <div className="foot-top">
-            <div className="foot-brand"><Link href="/" className="logo">Scout<span>Reddit</span></Link><p>Turn Reddit into your highest-converting channel.</p></div>
-            <div className="foot-col"><h4>Product</h4><a href="#features">Features</a><a href="#pricing">Pricing</a><Link href="/homepage">App</Link></div>
+            <div className="foot-brand">
+              <Link href="/" className="logo">Scout<span>Reddit</span></Link>
+              <p>Turn Reddit into your highest-converting acquisition channel.</p>
+            </div>
+            <div className="foot-col"><h4>Product</h4><a href="#features">Features</a><a href="#how">How it works</a><a href="#pricing">Pricing</a><Link href="/homepage">App</Link></div>
             <div className="foot-col"><h4>Account</h4><Link href="/signup">Sign up</Link><Link href="/signup?tab=login">Log in</Link></div>
             <div className="foot-col"><h4>Legal</h4><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link></div>
           </div>
-          <div className="foot-btm"><span>© {new Date().getFullYear()} ScoutReddit</span><span>Built for founders who ship</span></div>
+          <div className="foot-btm">
+            <span>© {new Date().getFullYear()} ScoutReddit</span>
+            <span>Built for founders who ship.</span>
+          </div>
         </div>
       </footer>
     </>

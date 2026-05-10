@@ -1,9 +1,8 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import Script from 'next/script'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
 
 const GOOGLE_CLIENT_ID = '582381287068-io9joj0kkqbrhnp33s6n06q6dd7niede.apps.googleusercontent.com'
 const SHEETS_URL       = 'https://script.google.com/macros/s/AKfycbyElB41_PM_KMrpu2UjvchHtncl46lTYrP6SkoSvdx22rqPI3iAaJbG6W_vluOomI78/exec'
@@ -12,7 +11,6 @@ function SignupForm() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const tabParam     = searchParams.get('tab')
-  const planParam    = searchParams.get('plan')
 
   const [tab,      setTab]      = useState(tabParam === 'login' ? 'login' : 'signup')
   const [name,     setName]     = useState('')
@@ -21,19 +19,14 @@ function SignupForm() {
   const [lEmail,   setLEmail]   = useState('')
   const [lPass,    setLPass]    = useState('')
   const [error,    setError]    = useState('')
-  const [loading,  setLoading]  = useState(false)
+  const [loading]               = useState(false)
   const googleRef = useRef(null)
 
-  // If already logged in
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('sr_user') || 'null')
-    if (user) {
-      if (planParam) doCheckout(planParam, user)
-      else router.push('/homepage')
-    }
+    if (user) router.push('/homepage')
   }, [])
 
-  // Init Google Sign-In
   useEffect(() => {
     const tryInit = setInterval(() => {
       if (typeof google !== 'undefined' && google?.accounts?.id) {
@@ -45,7 +38,7 @@ function SignupForm() {
         })
         if (googleRef.current && !googleRef.current.hasChildNodes()) {
           google.accounts.id.renderButton(googleRef.current, {
-            theme: 'outline', size: 'large', text: 'continue_with', width: 360,
+            theme: 'outline', size: 'large', text: 'continue_with', width: 320,
           })
           const loading = document.getElementById('google-loading')
           if (loading) loading.style.display = 'none'
@@ -81,40 +74,12 @@ function SignupForm() {
 
   function onAuthSuccess(user) {
     localStorage.setItem('sr_user', JSON.stringify(user))
-    sendToSheets(user)
-    if (planParam) doCheckout(planParam, user)
-    else router.push('/homepage')
-  }
-
-  async function doCheckout(planId, user) {
-    setLoading(true)
-    try {
-      const res  = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, email: user.email, name: user.name }),
-      })
-      const data = await res.json()
-      if (!data.url) throw new Error(data.error || 'No checkout URL')
-
-      if (typeof DodoPaymentsCheckout !== 'undefined') {
-        DodoPaymentsCheckout.DodoPayments.Initialize({
-          mode: 'live', displayType: 'overlay',
-          onEvent: (e) => {
-            if (['payment.succeeded','checkout.completed','subscription.active'].includes(e.type)) {
-              router.push('/homepage?payment=success&plan='+planId)
-            }
-          }
-        })
-        DodoPaymentsCheckout.DodoPayments.Checkout.open({ checkoutUrl: data.url })
-      } else {
-        window.location.href = data.url
-      }
-    } catch(e) {
-      console.error('Checkout:', e)
-      router.push('/homepage')
+    if (!localStorage.getItem('sr_trial_start')) {
+      localStorage.setItem('sr_trial_start', String(Date.now()))
     }
-    setLoading(false)
+    localStorage.setItem('sr_plan', 'trial')
+    sendToSheets(user)
+    router.push('/homepage')
   }
 
   async function sendToSheets(u) {
@@ -134,29 +99,22 @@ function SignupForm() {
   }
 
   return (
-    <div style={{minHeight:'100svh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:20,background:'var(--ink)'}}>
+    <div className="auth-page">
       <Script src="https://accounts.google.com/gsi/client" strategy="lazyOnload" />
-      <Script src="https://cdn.jsdelivr.net/npm/dodopayments-checkout@latest/dist/index.js" strategy="lazyOnload" />
 
-      <div style={{width:'100%',maxWidth:420,position:'relative',zIndex:1}}>
-        {/* Logo */}
-        <div style={{textAlign:'center',marginBottom:32}}>
+      <div className="auth-shell">
+        <div className="auth-head">
           <Link href="/" className="logo">Scout<span>Reddit</span></Link>
-          <div style={{fontSize:14,color:'var(--muted)',marginTop:8}}>
-            {tab === 'signup' ? 'Create your free account' : 'Welcome back'}
+          <div className="auth-sub">
+            {tab === 'signup' ? 'Start your 7-day free trial' : 'Welcome back'}
           </div>
         </div>
 
-        {/* Card */}
-        <div className="auth-modal" style={{position:'static',width:'auto',background:'var(--surf)',border:'1px solid var(--b2)',borderRadius:'var(--rxl)',padding:36}}>
-          {/* Plan notice */}
-          {planParam && (
-            <div style={{background:'var(--adim)',border:'1px solid var(--ab)',borderRadius:'var(--r)',padding:'10px 14px',fontSize:12,marginBottom:16}}>
-              ⚡ After signing up you&apos;ll be taken to checkout for {planParam === 'pro' ? 'Pro ($20/mo)' : 'Starter ($9/mo)'}
-            </div>
-          )}
+        <div className="auth-card">
+          <div className="trial-banner">
+            ✨ <strong>Full access for 7 days.</strong> No credit card required.
+          </div>
 
-          {/* Tabs */}
           <div className="auth-tabs">
             <button className={`auth-tab${tab==='signup'?' on':''}`} onClick={() => { setTab('signup'); setError('') }}>Sign up</button>
             <button className={`auth-tab${tab==='login'?' on':''}`}  onClick={() => { setTab('login');  setError('') }}>Log in</button>
@@ -177,22 +135,22 @@ function SignupForm() {
 
           {error && <div className="auth-err">{error}</div>}
 
-          <button className="auth-submit" onClick={submitAuth} disabled={loading} style={{marginTop:4}}>
-            {loading ? 'Loading…' : tab === 'signup' ? 'Create free account' : 'Log in'}
+          <button className="auth-submit" onClick={submitAuth} disabled={loading}>
+            {loading ? 'Loading…' : tab === 'signup' ? 'Start free trial →' : 'Log in →'}
           </button>
 
           <div className="auth-divider">or</div>
-          <div style={{display:'flex',justifyContent:'center',minHeight:44,alignItems:'center'}}>
+          <div className="google-wrap">
             <div ref={googleRef} id="google-signin-btn"></div>
-            <div id="google-loading" style={{fontSize:13,color:'#888'}}>Loading Google sign-in…</div>
+            <div id="google-loading" className="google-loading">Loading Google sign-in…</div>
           </div>
           <div className="auth-terms">
-            By signing up you agree to our <Link href="/terms" style={{color:'var(--acc)'}}>Terms</Link> and <Link href="/privacy" style={{color:'var(--acc)'}}>Privacy Policy</Link>.
+            By continuing you agree to our <Link href="/terms">Terms</Link> and <Link href="/privacy">Privacy Policy</Link>.
           </div>
         </div>
 
-        <div style={{textAlign:'center',marginTop:20,fontSize:13,color:'var(--muted)'}}>
-          ← <Link href="/" style={{color:'var(--acc)'}}>Back to homepage</Link>
+        <div className="auth-foot">
+          ← <Link href="/">Back to homepage</Link>
         </div>
       </div>
     </div>
